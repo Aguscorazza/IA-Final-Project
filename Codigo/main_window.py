@@ -1,0 +1,86 @@
+from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton
+from PyQt5.QtGui import QPainter, QColor
+
+
+class MazeWidget(QWidget):
+    def __init__(self, maze, controller):
+        super().__init__()
+        self.maze = maze
+        self.controller = controller
+        self.path = []
+        self.start_set = False
+        self.end_set = False
+        self.cell_size = 20
+        self.drawing_wall = False
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+
+        for rowID in range(self.maze.nbRows):
+            for columnID in range(self.maze.nbColumns):
+                if self.maze.grid[rowID][columnID] == 1:
+                    painter.setBrush(QColor(0, 0, 0))
+                elif self.maze.grid[rowID][columnID] == 2:
+                    painter.setBrush(QColor(0, 255, 0))
+                elif self.maze.grid[rowID][columnID] == 3:
+                    painter.setBrush(QColor(255, 0, 0))
+                else:
+                    painter.setBrush(QColor(255, 255, 255))
+                painter.drawRect(columnID * self.cell_size, rowID * self.cell_size, self.cell_size, self.cell_size)
+
+        painter.setBrush(QColor(0, 0, 255))
+        for x, y in self.path:
+            painter.drawRect(y * self.cell_size, x * self.cell_size, self.cell_size, self.cell_size)
+
+    def mousePressEvent(self, event):
+        widget_pos = self.mapFromGlobal(event.globalPos())
+        columnID = widget_pos.x() // self.cell_size
+        rowID = widget_pos.y() // self.cell_size
+
+        if rowID < 0 or rowID >= self.maze.nbRows or columnID < 0 or columnID >= self.maze.nbColumns:
+            return  # Ignore clicks outside the maze grid
+
+        if not self.start_set:
+            self.maze.setStartCell(rowID, columnID)
+            self.start_set = True
+        elif not self.end_set:
+            self.maze.setEndCell(rowID, columnID)
+            self.end_set = True
+        else:
+            self.drawing_wall = True
+            self.maze.setWallCell(rowID, columnID)
+
+        self.update()
+
+    def mouseMoveEvent(self, event):
+        if self.drawing_wall:
+            widget_pos = self.mapFromGlobal(event.globalPos())
+            columnID = widget_pos.x() // self.cell_size
+            rowID = widget_pos.y() // self.cell_size
+
+            if rowID >= 0 and rowID < self.maze.nbRows and columnID >= 0 or columnID < self.maze.nbColumns:
+                self.maze.setWallCell(rowID, columnID)
+                self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.drawing_wall = False
+
+class MainWindow(QMainWindow):
+    def __init__(self, controller):
+        super().__init__()
+        self.controller = controller
+
+        self.setWindowTitle("Maze Solver")
+        self.setGeometry(100, 100, 800, 600)
+
+        self.maze_widget = MazeWidget(self.controller.maze, self.controller)
+        self.solve_button = QPushButton("Solve Maze")
+        self.solve_button.clicked.connect(self.controller.solve_maze)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.maze_widget)
+        layout.addWidget(self.solve_button)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
