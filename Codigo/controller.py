@@ -2,6 +2,7 @@ class MazeController:
     def __init__(self, maze, solver):
         self.maze = maze
         self.solver = solver
+        self.solver.controller = self  # Link solver to controller
         self.maze_widget = None  # Initialize it later
 
     def solve_maze(self):

@@ -8,6 +8,8 @@ class Maze:
         self.grid = np.zeros((rows, columns), dtype=int)
         self.startCell = None
         self.endCell = None
+        self.openSetNodes = set()
+        self.closedSetNodes = set()
 
     def setStartCell(self, rowID, columnID):
         self.startCell = (rowID, columnID)
@@ -19,6 +21,16 @@ class Maze:
 
     def setWallCell(self, rowID, columnID):
         self.grid[rowID][columnID] = 1  # Wall
+
+    def addOpenSetNode(self, rowID, columnID):
+        self.openSetNodes.add((rowID, columnID))
+
+    def addClosedSetNode(self, rowID, columnID):
+        self.closedSetNodes.add((rowID, columnID))
+
+    def clearSetNodes(self):
+        self.openSetNodes.clear()
+        self.closedSetNodes.clear()
 
     def isWithinBounds(self, rowID, columnID):
         return 0 <= rowID < self.nbRows and 0 <= columnID < self.nbColumns

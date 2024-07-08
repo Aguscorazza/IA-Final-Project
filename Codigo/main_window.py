@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton
-from PyQt5.QtGui import QPainter, QColor
-
+from PyQt5.QtGui import QPainter, QColor, QFont
+from PyQt5.QtCore import Qt
 
 class MazeWidget(QWidget):
     def __init__(self, maze, controller):
@@ -12,9 +12,12 @@ class MazeWidget(QWidget):
         self.end_set = False
         self.cell_size = 20
         self.drawing_wall = False
+        self.closedSet = None
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        font = QFont("Arial", 8)
+        painter.setFont(font)
 
         for rowID in range(self.maze.nbRows):
             for columnID in range(self.maze.nbColumns):
@@ -24,20 +27,24 @@ class MazeWidget(QWidget):
                     painter.setBrush(QColor(0, 255, 0))
                 elif self.maze.grid[rowID][columnID] == 3:
                     painter.setBrush(QColor(255, 0, 0))
+                elif (rowID, columnID) in self.maze.closedSetNodes:
+                    painter.setBrush(QColor(100, 100, 100))  # Dark red for closed set nodes
+                elif (rowID, columnID) in self.maze.openSetNodes:
+                    painter.setBrush(QColor(0, 0, 200))  # Dark blue for open set nodes
                 else:
                     painter.setBrush(QColor(255, 255, 255))
                 painter.drawRect(columnID * self.cell_size, rowID * self.cell_size, self.cell_size, self.cell_size)
 
-        painter.setBrush(QColor(0, 0, 255))
-        for x, y in self.path:
-            painter.drawRect(y * self.cell_size, x * self.cell_size, self.cell_size, self.cell_size)
+        painter.setBrush(QColor(255, 255, 0))
+        for rowID, columnID in self.path:
+            painter.drawRect(columnID * self.cell_size, rowID * self.cell_size, self.cell_size, self.cell_size)
 
     def mousePressEvent(self, event):
         widget_pos = self.mapFromGlobal(event.globalPos())
         columnID = widget_pos.x() // self.cell_size
         rowID = widget_pos.y() // self.cell_size
 
-        if rowID < 0 or rowID >= self.maze.nbRows or columnID < 0 or columnID >= self.maze.nbColumns:
+        if rowID < 0 or rowID > self.maze.nbRows or columnID < 0 or columnID > self.maze.nbColumns:
             return  # Ignore clicks outside the maze grid
 
         if not self.start_set:
@@ -58,7 +65,7 @@ class MazeWidget(QWidget):
             columnID = widget_pos.x() // self.cell_size
             rowID = widget_pos.y() // self.cell_size
 
-            if rowID >= 0 and rowID < self.maze.nbRows and columnID >= 0 or columnID < self.maze.nbColumns:
+            if 0 <= rowID < self.maze.nbRows and  0 <= columnID < self.maze.nbColumns:
                 self.maze.setWallCell(rowID, columnID)
                 self.update()
 
