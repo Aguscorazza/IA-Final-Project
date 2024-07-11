@@ -1,14 +1,13 @@
 class MazeController:
-    def __init__(self, maze, solver):
+    def __init__(self, maze):
         self.maze = maze
-        self.solver = solver
-        self.solver.controller = self  # Link solver to controller
+        self.solver = None
         self.maze_widget = None  # Initialize it later
 
+    def set_solver(self, solver):
+        self.solver = solver
+        self.solver.controller = self  # Link solver to controller
+
     def solve_maze(self):
-        print("Solving maze...")
-        self.solver.maze = self.maze
-        path = self.solver.solve()
-        print(f"Path found: {path}")
-        self.maze_widget.path = path or []
-        self.maze_widget.update()
+        if self.solver:
+            self.solver.solve()

@@ -1,6 +1,8 @@
-from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QRadioButton, QHBoxLayout, QButtonGroup
 from PyQt5.QtGui import QPainter, QColor, QFont
 from PyQt5.QtCore import Qt
+from Solver import AStarSolver, DijkstraSolver, ModifiedAStarSolver
+
 
 class MazeWidget(QWidget):
     def __init__(self, maze, controller):
@@ -84,10 +86,46 @@ class MainWindow(QMainWindow):
         self.solve_button = QPushButton("Solve Maze")
         self.solve_button.clicked.connect(self.controller.solve_maze)
 
+        self.astar_radio = QRadioButton("A* Solver")
+        self.dijkstra_radio = QRadioButton("Dijkstra Solver")
+        self.modified_astar_radio = QRadioButton("Modified A* Solver")
+        self.astar_radio.setChecked(True)
+
+        self.radio_group = QButtonGroup()
+        self.radio_group.addButton(self.astar_radio)
+        self.radio_group.addButton(self.dijkstra_radio)
+        self.radio_group.addButton(self.modified_astar_radio)
+
+        radio_layout = QHBoxLayout()
+        radio_layout.addWidget(self.astar_radio)
+        radio_layout.addWidget(self.dijkstra_radio)
+        radio_layout.addWidget(self.modified_astar_radio)
+
         layout = QVBoxLayout()
         layout.addWidget(self.maze_widget)
+        layout.addLayout(radio_layout)
         layout.addWidget(self.solve_button)
 
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+
+        self.controller.set_solver(self.get_selected_solver())
+
+        self.astar_radio.toggled.connect(self.on_solver_changed)
+        self.dijkstra_radio.toggled.connect(self.on_solver_changed)
+        self.modified_astar_radio.toggled.connect(self.on_solver_changed)
+
+    def get_selected_solver(self):
+        if self.astar_radio.isChecked():
+            return AStarSolver(self.controller.maze)
+        elif self.dijkstra_radio.isChecked():
+            return DijkstraSolver(self.controller.maze)
+        elif self.modified_astar_radio.isChecked():
+            return ModifiedAStarSolver(self.controller.maze)
+
+    def on_solver_changed(self):
+        self.controller.set_solver(self.get_selected_solver())
+
+    def solve_maze(self):
+        self.controller.solve_maze()
