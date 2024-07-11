@@ -92,7 +92,9 @@ class AStarSolver(Solver):
 
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
-
+        for neighbor in self.get_neighbors(current):
+            self.maze.addOpenSetNode(*neighbor)
+            self.controller.maze_widget.update()
         for neighbor in self.get_neighbors(current):
             if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
                 self.timer.stop()
@@ -114,8 +116,7 @@ class AStarSolver(Solver):
                 # Adds the neighbor to the priority queue (open set) with its f_score as the priority.
                 # The priority queue ensures nodes with the lowest f_score are explored first.
                 heapq.heappush(self.openSet, (self.f_score[neighbor], neighbor))
-                self.maze.addOpenSetNode(*neighbor)
-                self.controller.maze_widget.update()
+
 
 
 class ModifiedAStarSolver(Solver):
@@ -161,7 +162,9 @@ class ModifiedAStarSolver(Solver):
 
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
-
+        for neighbor in self.get_neighbors(current):
+            self.maze.addOpenSetNode(*neighbor)
+            self.controller.maze_widget.update()
         for neighbor in self.get_neighbors(current):
             if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
                 self.timer.stop()
@@ -231,7 +234,9 @@ class DijkstraSolver(Solver):
 
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
-
+        for neighbor in self.get_neighbors(current):
+            self.maze.addOpenSetNode(*neighbor)
+            self.controller.maze_widget.update()
         for neighbor in self.get_neighbors(current):
             if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
                 self.timer.stop()
