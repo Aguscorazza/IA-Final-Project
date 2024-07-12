@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QRadioButton, QHBoxLayout, QButtonGroup
+from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QRadioButton, QHBoxLayout, QButtonGroup, \
+    QDesktopWidget
 from PyQt5.QtGui import QPainter, QColor, QFont
 from PyQt5.QtCore import Qt
 from Solver import AStarSolver, DijkstraSolver, ModifiedAStarSolver
@@ -50,14 +51,17 @@ class MazeWidget(QWidget):
             return  # Ignore clicks outside the maze grid
 
         if not self.start_set:
-            self.maze.setStartCell(rowID, columnID)
-            self.start_set = True
+            if self.maze.grid[rowID][columnID] == 0:
+                self.maze.setStartCell(rowID, columnID)
+                self.start_set = True
         elif not self.end_set:
-            self.maze.setEndCell(rowID, columnID)
-            self.end_set = True
+            if self.maze.grid[rowID][columnID] == 0:
+                self.maze.setEndCell(rowID, columnID)
+                self.end_set = True
         else:
             self.drawing_wall = True
-            self.maze.setWallCell(rowID, columnID)
+            if self.maze.grid[rowID][columnID] == 0:
+                self.maze.setWallCell(rowID, columnID)
 
         self.update()
 
@@ -68,11 +72,18 @@ class MazeWidget(QWidget):
             rowID = widget_pos.y() // self.cell_size
 
             if 0 <= rowID < self.maze.nbRows and  0 <= columnID < self.maze.nbColumns:
-                self.maze.setWallCell(rowID, columnID)
-                self.update()
+                if self.maze.grid[rowID][columnID] == 0:
+                    self.maze.setWallCell(rowID, columnID)
+                    self.update()
 
     def mouseReleaseEvent(self, event):
         self.drawing_wall = False
+
+    def clearMaze(self):
+        self.start_set = False
+        self.end_set = False
+        self.path = []
+        self.update()
 
 class MainWindow(QMainWindow):
     def __init__(self, controller):
@@ -80,11 +91,21 @@ class MainWindow(QMainWindow):
         self.controller = controller
 
         self.setWindowTitle("Maze Solver")
-        self.setGeometry(100, 100, 800, 600)
+        # Get screen resolution
+        screen_resolution = QDesktopWidget().screenGeometry()
+        width, height = int(screen_resolution.width()*0.80), int(screen_resolution.height()*0.85)
+
+        self.setGeometry(150, 100, width, height)
 
         self.maze_widget = MazeWidget(self.controller.maze, self.controller)
         self.solve_button = QPushButton("Solve Maze")
         self.solve_button.clicked.connect(self.controller.solve_maze)
+
+        self.generate_button = QPushButton("Generate Maze")
+        self.generate_button.clicked.connect(self.generate_maze)
+
+        self.clear_button = QPushButton("Clear Maze")
+        self.clear_button.clicked.connect(self.clear_maze)
 
         self.astar_radio = QRadioButton("A* Solver")
         self.dijkstra_radio = QRadioButton("Dijkstra Solver")
@@ -96,18 +117,24 @@ class MainWindow(QMainWindow):
         self.radio_group.addButton(self.dijkstra_radio)
         self.radio_group.addButton(self.modified_astar_radio)
 
-        radio_layout = QHBoxLayout()
+        radio_layout = QVBoxLayout()
         radio_layout.addWidget(self.astar_radio)
         radio_layout.addWidget(self.dijkstra_radio)
         radio_layout.addWidget(self.modified_astar_radio)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.maze_widget)
-        layout.addLayout(radio_layout)
-        layout.addWidget(self.solve_button)
+        left_layout = QVBoxLayout()
+        left_layout.setAlignment(Qt.AlignTop)
+        left_layout.addLayout(radio_layout)
+        left_layout.addWidget(self.solve_button)
+        left_layout.addWidget(self.generate_button)
+        left_layout.addWidget(self.clear_button)
+        main_layout = QHBoxLayout()
+
+        main_layout.addLayout(left_layout, stretch=2)
+        main_layout.addWidget(self.maze_widget, stretch=4)
 
         container = QWidget()
-        container.setLayout(layout)
+        container.setLayout(main_layout)
         self.setCentralWidget(container)
 
         self.controller.set_solver(self.get_selected_solver())
@@ -129,3 +156,12 @@ class MainWindow(QMainWindow):
 
     def solve_maze(self):
         self.controller.solve_maze()
+
+    def clear_maze(self):
+        self.controller.clear_maze()
+        self.maze_widget.clearMaze()
+
+    def generate_maze(self):
+        self.maze_widget.clearMaze()
+        self.controller.generate_maze()
+        self.maze_widget.update()

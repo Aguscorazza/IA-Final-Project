@@ -8,7 +8,7 @@ def main():
     print("Starting application...")
     app = QApplication(sys.argv)
 
-    maze = Maze(20, 20)
+    maze = Maze(40, 40)
     controller = MazeController(maze)
 
     window = MainWindow(controller)

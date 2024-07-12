@@ -11,3 +11,11 @@ class MazeController:
     def solve_maze(self):
         if self.solver:
             self.solver.solve()
+
+    def generate_maze(self):
+        if self.maze:
+            self.maze.generateMaze()
+
+    def clear_maze(self):
+        if self.maze:
+            self.maze.clearMaze()
