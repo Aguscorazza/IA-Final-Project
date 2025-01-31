@@ -1,7 +1,8 @@
 import heapq
+import random
+import numpy as np
 from PyQt5.QtCore import QTimer, pyqtSignal, QObject
 from datetime import datetime
-
 
 class Solver(QObject):
     solve_completed = pyqtSignal()
@@ -61,7 +62,8 @@ class AStarSolver(Solver):
 
     def heuristic(self, current, target):
         (x1, y1), (x2, y2) = current, target
-        return abs(x1 - x2) + abs(y1 - y2)
+        #return np.sqrt((x1-x2)**2 + (y1-y2)**2) # Euclidean Distance
+        return abs(x1 - x2) + abs(y1 - y2)      # Manhattan Distance
 
     def eval_function(self, values):
         if isinstance(values, list):
@@ -98,25 +100,25 @@ class AStarSolver(Solver):
         # Pop first element of the queue (node with minimum value of f_score)
         _, current = heapq.heappop(self.openSet)
 
+        # Check if we've reached the goal
+        if current == self.endCell:
+            self.timer.stop()
+            self.end_time = datetime.now()
+            path = self.reconstruct_path(current)
+            self.controller.maze_widget.path = path
+            self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
+            self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
+            self.controller.maze_widget.path_stats["Route_Cost"] = self.g_score.get(current, float('inf'))
+            self.solve_completed.emit()
+            self.controller.maze_widget.update()
+            return
+
         self.visited_count += 1
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
         for neighbor in self.get_neighbors(current):
-            self.maze.addOpenSetNode(*neighbor)
-            self.controller.maze_widget.update()
-        for neighbor in self.get_neighbors(current):
-            if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
-                self.timer.stop()
-                self.end_time = datetime.now()
-                self.cameFrom[neighbor] = current
-                path = self.reconstruct_path(current)
-                self.controller.maze_widget.path = path
-                self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
-                self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
-                self.solve_completed.emit()
-                self.controller.maze_widget.update()
-                return
-
+            if neighbor in self.maze.closedSetNodes:
+                continue
             # Get cost from the start node to the current node (defaulting to infinity if it's not found),
             # adds the cost of moving from the current node to the neighbor which is assumed to be 1
             tentative_g_score = self.g_score.get(current, float('inf')) + 1
@@ -129,6 +131,8 @@ class AStarSolver(Solver):
                 # Adds the neighbor to the priority queue (open set) with its f_score as the priority.
                 # The priority queue ensures nodes with the lowest f_score are explored first.
                 heapq.heappush(self.openSet, (self.f_score[neighbor], neighbor))
+                self.maze.addOpenSetNode(*neighbor)
+                self.controller.maze_widget.update()
 
 
 class ModifiedAStarSolver(Solver):
@@ -174,25 +178,25 @@ class ModifiedAStarSolver(Solver):
         # Pop first element of the queue (node with minimum value of f_score)
         _, current = heapq.heappop(self.openSet)
 
+        if current == self.endCell:
+            self.timer.stop()
+            self.end_time = datetime.now()
+            path = self.reconstruct_path(current)
+            self.controller.maze_widget.path = path
+            self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
+            self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
+            self.controller.maze_widget.path_stats["Route_Cost"] = self.g_score.get(current, float('inf'))
+            self.solve_completed.emit()
+            self.controller.maze_widget.update()
+            return
+
         self.visited_count += 1
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
-        for neighbor in self.get_neighbors(current):
-            self.maze.addOpenSetNode(*neighbor)
-            self.controller.maze_widget.update()
-        for neighbor in self.get_neighbors(current):
-            if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
-                self.timer.stop()
-                self.end_time = datetime.now()
-                self.cameFrom[neighbor] = current
-                path = self.reconstruct_path(current)
-                self.controller.maze_widget.path = path
-                self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
-                self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
-                self.solve_completed.emit()
-                self.controller.maze_widget.update()
-                return
 
+        for neighbor in self.get_neighbors(current):
+            if neighbor in self.maze.closedSetNodes:
+                continue
             # Get cost from the start node to the current node (defaulting to infinity if it's not found),
             # adds the cost of moving from the current node to the neighbor which is assumed to be 1
             tentative_g_score = self.g_score.get(current, float('inf')) + 1
@@ -254,25 +258,25 @@ class DijkstraSolver(Solver):
         # Pop first element of the queue (node with minimum value of f_score)
         _, current = heapq.heappop(self.openSet)
 
+        if current == self.endCell:
+            self.timer.stop()
+            self.end_time = datetime.now()
+            path = self.reconstruct_path(current)
+            self.controller.maze_widget.path = path
+            self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
+            self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
+            self.controller.maze_widget.path_stats["Route_Cost"] = self.g_score.get(current, float('inf'))
+            self.solve_completed.emit()
+            self.controller.maze_widget.update()
+            return
+
         self.visited_count += 1
         self.maze.addClosedSetNode(*current)
         self.controller.maze_widget.update()
-        for neighbor in self.get_neighbors(current):
-            self.maze.addOpenSetNode(*neighbor)
-            self.controller.maze_widget.update()
-        for neighbor in self.get_neighbors(current):
-            if neighbor == self.endCell:  # Skip further exploration if neighbor is the destination
-                self.timer.stop()
-                self.end_time = datetime.now()
-                self.cameFrom[neighbor] = current
-                path = self.reconstruct_path(current)
-                self.controller.maze_widget.path = path
-                self.controller.maze_widget.path_stats["N_Visited"] = self.visited_count
-                self.controller.maze_widget.path_stats["Time_Spent"] = self.end_time - self.start_time
-                self.solve_completed.emit()
-                self.controller.maze_widget.update()
-                return
 
+        for neighbor in self.get_neighbors(current):
+            if neighbor in self.maze.closedSetNodes:
+                continue
             # Get cost from the start node to the current node (defaulting to infinity if it's not found),
             # adds the cost of moving from the current node to the neighbor which is assumed to be 1
             tentative_g_score = self.g_score.get(current, float('inf')) + 1

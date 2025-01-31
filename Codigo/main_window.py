@@ -1,92 +1,11 @@
 from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QRadioButton, QHBoxLayout, QButtonGroup, \
-    QDesktopWidget, QLabel
+    QDesktopWidget, QLabel, QAction, QToolBar, QStackedWidget
 from PyQt5.QtGui import QPainter, QColor, QFont
 from PyQt5.QtCore import Qt
 from Solver import AStarSolver, DijkstraSolver, ModifiedAStarSolver
-
-
-class MazeWidget(QWidget):
-    def __init__(self, maze, controller):
-        super().__init__()
-        self.maze = maze
-        self.controller = controller
-        self.path = []
-        self.start_set = False
-        self.end_set = False
-        self.cell_size = 20
-        self.drawing_wall = False
-        self.closedSet = None
-        self.path_stats = {}
-        self.setMinimumSize(800, 800)  # Set a minimum size for the MazeWidget
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        font = QFont("Arial", 8)
-        painter.setFont(font)
-
-        for rowID in range(self.maze.nbRows):
-            for columnID in range(self.maze.nbColumns):
-                if self.maze.grid[rowID][columnID] == 1:
-                    painter.setBrush(QColor(0, 0, 0))
-                elif self.maze.grid[rowID][columnID] == 2:
-                    painter.setBrush(QColor(0, 255, 0))
-                elif self.maze.grid[rowID][columnID] == 3:
-                    painter.setBrush(QColor(255, 0, 0))
-                elif (rowID, columnID) in self.maze.closedSetNodes:
-                    painter.setBrush(QColor(100, 100, 100))  # Dark red for closed set nodes
-                elif (rowID, columnID) in self.maze.openSetNodes:
-                    painter.setBrush(QColor(0, 0, 200))  # Dark blue for open set nodes
-                else:
-                    painter.setBrush(QColor(255, 255, 255))
-                painter.drawRect(columnID * self.cell_size, rowID * self.cell_size, self.cell_size, self.cell_size)
-
-        painter.setBrush(QColor(255, 255, 0))
-        for rowID, columnID in self.path:
-            painter.drawRect(columnID * self.cell_size, rowID * self.cell_size, self.cell_size, self.cell_size)
-
-    def mousePressEvent(self, event):
-        widget_pos = self.mapFromGlobal(event.globalPos())
-        columnID = widget_pos.x() // self.cell_size
-        rowID = widget_pos.y() // self.cell_size
-
-        if rowID < 0 or rowID > self.maze.nbRows or columnID < 0 or columnID > self.maze.nbColumns:
-            return  # Ignore clicks outside the maze grid
-
-        if not self.start_set:
-            if self.maze.grid[rowID][columnID] == 0:
-                self.maze.setStartCell(rowID, columnID)
-                self.start_set = True
-        elif not self.end_set:
-            if self.maze.grid[rowID][columnID] == 0:
-                self.maze.setEndCell(rowID, columnID)
-                self.end_set = True
-        else:
-            self.drawing_wall = True
-            if self.maze.grid[rowID][columnID] == 0:
-                self.maze.setWallCell(rowID, columnID)
-
-        self.update()
-
-    def mouseMoveEvent(self, event):
-        if self.drawing_wall:
-            widget_pos = self.mapFromGlobal(event.globalPos())
-            columnID = widget_pos.x() // self.cell_size
-            rowID = widget_pos.y() // self.cell_size
-
-            if 0 <= rowID < self.maze.nbRows and 0 <= columnID < self.maze.nbColumns:
-                if self.maze.grid[rowID][columnID] == 0:
-                    self.maze.setWallCell(rowID, columnID)
-                    self.update()
-
-    def mouseReleaseEvent(self, event):
-        self.drawing_wall = False
-
-    def clearMaze(self):
-        self.start_set = False
-        self.end_set = False
-        self.path = []
-        self.update()
-
+from STRIPSBoxOrderWidget import BoxOrderWindow
+from ObjectRecognitionWindow import ObjectRecognitionWindow
+from MazeWidget import  MazeWidget
 
 class MainWindow(QMainWindow):
     def __init__(self, controller):
@@ -96,12 +15,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Maze Generator & Solver")
         # Get screen resolution
         screen_resolution = QDesktopWidget().screenGeometry()
-        width, height = int(screen_resolution.width() * 0.80), int(screen_resolution.height() * 0.85)
+        width, height = int(screen_resolution.width()), int(screen_resolution.height())
 
         title_font = QFont("Arial", 15)
         normal_font = QFont("Arial", 10)
 
-        self.setGeometry(150, 100, width, height)
+        self.setGeometry(0, 0, width, height)
 
         self.maze_widget = MazeWidget(self.controller.maze, self.controller)
         self.solve_button = QPushButton("Solve Maze")
@@ -165,9 +84,22 @@ class MainWindow(QMainWindow):
         centered_layout.addWidget(self.maze_widget, alignment=Qt.AlignCenter)
         main_layout.addLayout(centered_layout, stretch=4)
 
+
+        # STRIPS Box Order Widget
         container = QWidget()
         container.setLayout(main_layout)
-        self.setCentralWidget(container)
+
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.addWidget(container)
+        self.box_order_window = BoxOrderWindow(self.controller)
+        self.stacked_widget.addWidget(self.box_order_window)
+        self.object_recognition_window = ObjectRecognitionWindow(controller)
+        self.stacked_widget.addWidget(self.object_recognition_window)
+
+        self.setCentralWidget(self.stacked_widget)
+        self.controller.set_solver(self.get_selected_solver())
+
+        self.setCentralWidget(self.stacked_widget)
 
         self.controller.set_solver(self.get_selected_solver())
 
@@ -181,15 +113,37 @@ class MainWindow(QMainWindow):
         self.path_stats_label = QLabel()
         self.path_stats_label.setContentsMargins(15, 10, 0, 0)
         self.path_stats_label.setFont(normal_font)
+        self.path_stats_label.setStyleSheet("color: black; font-size: 20px; padding-top: 20px")
         left_layout.addWidget(self.path_stats_label)
 
         self.controller.solver.solve_completed.connect(self.update_path_stats_label)
+
+        self.create_toolbar()
+
+    def create_toolbar(self):
+        toolbar = QToolBar("Main Toolbar")
+        toolbar.setStyleSheet("background-color: #AAAAAA;")
+        self.addToolBar(toolbar)
+
+        maze_action = QAction("Maze Solver", self)
+        maze_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(0))
+        toolbar.addAction(maze_action)
+
+        box_order_action = QAction("Box Order", self)
+        box_order_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        toolbar.addAction(box_order_action)
+
+        object_recognition_action = QAction("Object Recognition", self)
+        object_recognition_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(2))
+        toolbar.addAction(object_recognition_action)
 
     def update_path_stats_label(self):
         path_stats = self.maze_widget.path_stats
         text = f"""Solver Information: 
         \tNumber of visited cells: {path_stats["N_Visited"]}
-        \tTime Spent: {path_stats["Time_Spent"]}"""
+        \tTime Spent: {path_stats["Time_Spent"]}
+        \tRoute Cost: {path_stats["Route_Cost"]} steps"""
+
         self.path_stats_label.setText(text)
 
     def get_selected_solver(self):
