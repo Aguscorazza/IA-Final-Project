@@ -110,19 +110,20 @@ class ObjectRecognitionWindow(QWidget):
         right_column.addWidget(self.preprocessed_image_text)
         right_column.addWidget(self.processed_image_label)
 
+
         # Label for features title
         self.features_label = QLabel("Preprocessed Features")
         self.features_label.setAlignment(Qt.AlignHCenter)
-        self.features_label.setStyleSheet("font-weight: bold; font-size:12pt; padding:5px 0px;")
+        self.features_label.setStyleSheet("font-weight: bold; font-size:12pt; padding:0px;")
         self.features_label.setVisible(False)
         right_column.addWidget(self.features_label)
 
-        # Grid layout for displaying features (5 rows × 2 columns)
+        # Grid layout for displaying features (3 rows × 3 columns)
         self.features_grid = QGridLayout()
         self.features_grid.setAlignment(Qt.AlignHCenter)
         # Add layout for displaying preprocessed features
         self.features_container = QWidget()
-        self.features_container.setStyleSheet("padding: 5px 0px;")
+        self.features_container.setStyleSheet("padding: 0px;")
         self.features_container.setLayout(self.features_grid)
         right_column.addWidget(self.features_container)
 
@@ -159,15 +160,24 @@ class ObjectRecognitionWindow(QWidget):
         algorithm = "K-Means" if self.kmeans_radio.isChecked() else "KNN"
 
         # Call controller function with image and selected algorithm
-        vote_result, confidence, processed_image, features = self.controller.launch_algorithm(algorithm, self.image_array)
+        result_list = self.controller.launch_algorithm(algorithm, self.image_array)
 
-        # **Update Labels**
-        self.vote_result_label.setText(f"Vote Result: {vote_result}")
-        self.confidence_label.setText(f"Confidence: {confidence*100:.2f}%")
+
+        if len(result_list) == 5:
+            # KNN results
+            vote_result, confidence, processed_image, features, scaled_features = result_list
+
+            # **Update Labels**
+            self.vote_result_label.setText(f"Vote Result: {vote_result}")
+            self.confidence_label.setText(f"Confidence: {confidence * 100:.2f}%")
+        else:
+            vote_group, vote_result, confidence, processed_image, features, scaled_features = result_list
+            self.vote_result_label.setText(f"Vote Group: {vote_group} - Group Label: {vote_result}")
+            self.confidence_label.setText(f"Clustering accuracy: {confidence * 100:.2f}%")
 
         # Display Preprocessed Images
         self.update_preprocessed_image(processed_image)
-        self.update_preprocessed_features(features)
+        self.update_preprocessed_features(features, scaled_features)
 
     def update_preprocessed_image(self, image_array):
         """
@@ -188,7 +198,7 @@ class ObjectRecognitionWindow(QWidget):
             self.processed_image_label.setPixmap(pixmap.scaled(500, 500, Qt.KeepAspectRatio))  # Scale down to 200x200
             self.processed_image_label.setVisible(True)
 
-    def update_preprocessed_features(self, features):
+    def update_preprocessed_features(self, features, scaled_features):
         """
         Update the grid of preprocessed features in the right column.
 
@@ -202,14 +212,22 @@ class ObjectRecognitionWindow(QWidget):
         if isinstance(features, dict):
             for feature_name, feature_value in features.items():
                 # Add feature name as QLabel
-                feature_name_label = QLabel(f"{feature_name}: {feature_value:.2e}")
-                feature_name_label.setStyleSheet("padding: 10px; font-size: 12pt;")
+                feature_name_label = QLabel(f"{feature_name}: {feature_value:.2f}")
+                feature_name_label.setStyleSheet("padding: 5px 20px; font-size: 12pt;")
                 self.features_grid.addWidget(feature_name_label, row, col)
 
                 row += 1
-                if row == 5:  # If we reach 5 rows, move to the next column
-                    row = 0
-                    col = 1  # Move to the second column
+
+        row = 0
+        col = 1
+        if isinstance(features, dict):
+            for feature_name, feature_value in scaled_features.items():
+                # Add feature name as QLabel
+                feature_name_label = QLabel(f"{feature_name}: {feature_value:.2f}")
+                feature_name_label.setStyleSheet("padding: 5px 20px; font-size: 12pt;")
+                self.features_grid.addWidget(feature_name_label, row, col)
+
+                row += 1
 
     def reset_labels(self):
         for i in reversed(range(self.features_grid.count())):

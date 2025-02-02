@@ -1,5 +1,5 @@
 import subprocess
-from KNN import KNN
+from ObjectRecognitionAlgorithm import KNN, KMeans
 
 class MazeController:
     def __init__(self, maze):
@@ -134,18 +134,27 @@ class MazeController:
     def launch_algorithm(self, algorithm, image):
         if algorithm == "K-Means":
             # Calls KMeans
-            pass
+            kmeans = KMeans(train_filename='train_features.csv', predict_image=image)
+            vote_group, vote_result, confidence, hull_image, features, scaled_features = kmeans.launch_kmeans()
+
+            features_names = ['Hu_Moment_1', 'Circle_Area_Ratio', 'Eccentricity']
+            features_dict = dict(zip(features_names, features))
+            scaled_features_names = ['Scaled_Hu_Moment_1', 'Scaled_Circle_Area_Ratio', 'Scaled_Eccentricity']
+            features_dict_scaled = dict(zip(scaled_features_names, scaled_features))
+
+            return [vote_group, vote_result, confidence, hull_image, features_dict, features_dict_scaled]
+
         elif algorithm == "KNN":
             # Calls KNN
             knn = KNN(k=7, train_filename='train_features.csv', predict_image=image)
-            vote_result, confidence, hull_image, features = knn.launch_knn()
+            vote_result, confidence, hull_image, features, scaled_features = knn.launch_knn()
 
-            features_names = ['Hu_Moment_1', 'Hu_Moment_2', 'Hu_Moment_3', 'Hu_Moment_4',
-                              'Hu_Moment_5', 'Hu_Moment_6', 'Circle_Area_Ratio', 'Axis_Aspect_Ratio',
-                              'Eccentricity', 'Per_Area_Ratio']
+            features_names = ['Hu_Moment_1', 'Circle_Area_Ratio', 'Eccentricity']
             features_dict = dict(zip(features_names, features))
+            scaled_features_names = ['Scaled_Hu_Moment_1', 'Scaled_Circle_Area_Ratio', 'Scaled_Eccentricity']
+            features_dict_scaled = dict(zip(scaled_features_names, scaled_features))
 
-            return vote_result, confidence, hull_image, features_dict
+            return [vote_result, confidence, hull_image, features_dict, features_dict_scaled]
 
         else:
             raise "Invalid algorithm."
