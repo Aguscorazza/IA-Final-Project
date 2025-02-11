@@ -214,7 +214,7 @@ class ModifiedAStarSolver(Solver):
                 self.controller.maze_widget.update()
 
 
-class DijkstraSolver(Solver):
+class BPASolver(Solver):
     def __init__(self, maze):
         super().__init__(maze)
 

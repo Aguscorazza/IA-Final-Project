@@ -9,15 +9,13 @@ import numpy as np
 class ObjectRecognitionWindow(QWidget):
     def __init__(self, controller):
         super().__init__()
-        self.setWindowTitle("Object Recognition")
+        self.setWindowTitle("Etapa 1 - Identificación de objetos")
         self.setMinimumSize(600, 800)
         self.setStyleSheet("background-color: none;")
 
         self.controller = controller
-        # Store image array
         self.image_array = None
         self.processed_images = []  # Store processed images as numpy arrays
-
 
         # Main horizontal layout
         main_layout = QHBoxLayout()
@@ -29,24 +27,24 @@ class ObjectRecognitionWindow(QWidget):
         left_column.setAlignment(Qt.AlignHCenter)
 
         # Add widgets to the left column
-        label = QLabel("Object Recognition Window")
+        label = QLabel("Identificación de objetos")
         label.setStyleSheet("font-size: 18pt; padding: 10px; font-weight: bold;")
         left_column.addWidget(label)
 
         # Button to load image
-        self.load_button = QPushButton("Load Image")
+        self.load_button = QPushButton("Cargar imagen")
         self.load_button.setStyleSheet("font-size: 12pt; padding: 5px; background-color: rgb(200, 200, 200);")
         self.load_button.clicked.connect(self.load_image)  # Connect to function
         left_column.addWidget(self.load_button)
 
         # Image display label
-        self.image_label = QLabel("No Image Loaded")
+        self.image_label = QLabel("No se ha cargado una imagen")
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setStyleSheet("border: 1px solid black; padding: 5px;")
         left_column.addWidget(self.image_label)
 
         # Recognition algorithm label
-        self.algorithm_label = QLabel("Recognition algorithm:")
+        self.algorithm_label = QLabel("Algoritmo de reconocimiento:")
         self.algorithm_label.setAlignment(Qt.AlignLeft)
         self.algorithm_label.setStyleSheet("padding: 5px; font-size: 12pt;")
         left_column.addWidget(self.algorithm_label)
@@ -73,7 +71,7 @@ class ObjectRecognitionWindow(QWidget):
 
         left_column.addLayout(algo_layout)
 
-        self.launch = QPushButton("Launch algorithm")
+        self.launch = QPushButton("Ejecutar algoritmo")
         self.launch.setStyleSheet("font-size: 12pt; padding: 5px; margin:10px 50px; background-color: rgb(200, 200, 200);")
         self.launch.clicked.connect(self.run_algorithm)
         left_column.addWidget(self.launch)
@@ -98,7 +96,7 @@ class ObjectRecognitionWindow(QWidget):
         right_column.setAlignment(Qt.AlignTop)
 
         # Label for preprocessed image
-        self.preprocessed_image_text = QLabel("Preprocessed Image with Convex Hull")
+        self.preprocessed_image_text = QLabel("Imagen procesada junto a la envolvente convexa")
         self.preprocessed_image_text.setVisible(False)
         self.preprocessed_image_text.setAlignment(Qt.AlignCenter)
         self.preprocessed_image_text.setStyleSheet("padding-top:30px; font-size: 14pt")
@@ -112,7 +110,7 @@ class ObjectRecognitionWindow(QWidget):
 
 
         # Label for features title
-        self.features_label = QLabel("Preprocessed Features")
+        self.features_label = QLabel("Características extraídas")
         self.features_label.setAlignment(Qt.AlignHCenter)
         self.features_label.setStyleSheet("font-weight: bold; font-size:12pt; padding:0px;")
         self.features_label.setVisible(False)
@@ -153,8 +151,9 @@ class ObjectRecognitionWindow(QWidget):
     def run_algorithm(self):
         """ Send the image array to the controller when launch button is clicked. """
         if self.image_array is None:
-            self.image_label.setText("Please load an image first.")
+            self.image_label.setText("Por favor, seleccione una imagen antes de ejecutar un algoritmo.")
             return
+        self.reset_labels()
 
         # Determine selected algorithm
         algorithm = "K-Means" if self.kmeans_radio.isChecked() else "KNN"
@@ -168,12 +167,12 @@ class ObjectRecognitionWindow(QWidget):
             vote_result, confidence, processed_image, features, scaled_features = result_list
 
             # **Update Labels**
-            self.vote_result_label.setText(f"Vote Result: {vote_result}")
-            self.confidence_label.setText(f"Confidence: {confidence * 100:.2f}%")
+            self.vote_result_label.setText(f"Clase resultante: {vote_result}")
+            self.confidence_label.setText(f"Confianza: {confidence * 100:.2f}%")
         else:
             vote_group, vote_result, confidence, processed_image, features, scaled_features = result_list
-            self.vote_result_label.setText(f"Vote Group: {vote_group} - Group Label: {vote_result}")
-            self.confidence_label.setText(f"Clustering accuracy: {confidence * 100:.2f}%")
+            self.vote_result_label.setText(f"Grupo resultante: {vote_group} - Clase: {vote_result}")
+            self.confidence_label.setText(f"Precisión del agrupamiento: {confidence * 100:.2f}%")
 
         # Display Preprocessed Images
         self.update_preprocessed_image(processed_image)

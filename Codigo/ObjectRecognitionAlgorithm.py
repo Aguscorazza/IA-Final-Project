@@ -7,7 +7,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from scipy.stats import mode
 from skimage import color, filters
-from skimage.morphology import disk, closing
+from skimage.morphology import disk, binary_closing
 from skimage.filters import threshold_otsu, threshold_li
 import cv2
 
@@ -15,8 +15,24 @@ import cv2
 class ImageRecognitionAlgorithm:
     # Estos valores fueron obtenidos del Standard scaler después de
     # aplicarlo a los training instances (NO MODIFICAR)
-    features_mean_ = np.array([0.38477562, 0.5522563 , 0.55143874])
-    features_var_ = np.array([0.0844822 , 0.13646293, 0.13703266])
+    features_mean_ = np.array([ 3.84775619e-01,  2.05266479e-01,  6.06069527e-03,  4.88774242e-03,
+        8.02606812e-05,  3.82024021e-03, -1.51912884e-08,  8.57088350e+04,
+        2.21141749e+03,  4.75608075e-01,  6.76078372e-01,  8.21467071e-01,
+        8.22579423e-01,  5.52256299e-01,  6.69292849e-01,  5.51438738e-01,
+        2.21659637e-02])
+
+    features_var_ = np.array([8.44821990e-02, 9.30134667e-02, 6.30604977e-05, 5.11569028e-05,
+       2.15418556e-08, 4.01467314e-05, 1.20044068e-14, 3.19930778e+09,
+       3.91801831e+06, 1.28554142e-01, 9.72304043e-02, 3.23354363e-02,
+       3.26561282e-02, 1.36462925e-01, 1.10929737e-01, 1.37032663e-01,
+       1.17376805e-04])
+
+    features_names = ['Hu1_hull', 'Hu2_hull', 'Hu3_hull', 'Hu4_hull', 'Hu5_hull', 'Hu6_hull',
+    'Hu7_hull', 'Area', 'Perimeter', 'Circularity', 'Hull_Circularity',
+    'Solidity', 'Convexity', 'Circle_Area_Ratio', 'Axis_Aspect_Ratio',
+    'Eccentricity', 'Perimeter_Area_Ratio']
+
+    chosen_features = ['Hu1_hull', 'Hull_Circularity', 'Circle_Area_Ratio', 'Eccentricity']
 
     category_mapping = {0: 'arandela', 1: 'clavo', 2: 'tornillo', 3: 'tuerca'}
 
@@ -26,18 +42,18 @@ class ImageRecognitionAlgorithm:
         mean_color = img.mean(axis=(0, 1))
         print(f"Mean color (RGB): {mean_color}")
 
-        # Define a threshold for background detection (adjustable)
+        # Threshold para la detección del fondo
         threshold = 85
 
-        # Create a mask where pixels close to mean color are set to black
+        # Máscara donde los pixeles cerca del color del fondo se vuelven negros
         mask = np.linalg.norm(img - mean_color, axis=-1) < threshold
         img[mask] = [0, 0, 0]  # Convert background to black
 
-        # Convert to grayscale
+        # Convertir a escala de grises
         # Reducimos el número de canales de 3 a 1
         gray_img = color.rgb2gray(img)
 
-        if gray_img.shape[1] > gray_img.shape[0]:  # Width > Height
+        if gray_img.shape[1] > gray_img.shape[0]:
             gray_img = np.rot90(gray_img)  # Rotate 90 degrees to make it portrait
 
         # Apply a median filter
@@ -53,7 +69,7 @@ class ImageRecognitionAlgorithm:
             print(f"Inverting colors...")
 
         # Closing Filtering
-        closed_image = closing(thresh_image, disk(10))
+        closed_image = binary_closing(thresh_image, disk(10))
 
         return gray_img, img_filtered, thresh_image, closed_image
 
@@ -61,8 +77,9 @@ class ImageRecognitionAlgorithm:
     def search_contours(image, min_length=100):
         contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
-            return None  # Return None if no contours are found
-        return max(contours, key=cv2.contourArea)  # Return the longest contour
+            return None  # None si ningún contorno
+        return max(contours, key=cv2.contourArea)  # Devuelve el contorno mas grande
+
         #return [cnt for cnt in contours if cv2.arcLength(cnt, closed=True) >= min_length]
 
     @staticmethod
@@ -70,7 +87,7 @@ class ImageRecognitionAlgorithm:
         all_points = np.vstack(contours)
         cv2_contours = np.array(all_points, dtype=np.int32)
 
-        # Compute convex hull of the main contour
+        # Calcula el convex_hull de los contornos de cada imagen
         convex_hull = cv2.convexHull(cv2_contours)
 
         # Get bounding rectangle around the convex hull
@@ -79,7 +96,8 @@ class ImageRecognitionAlgorithm:
         # Crop the image using the bounding rectangle
         cropped = image[y:y + h, x:x + w]
 
-        # Adjust the contours by shifting them to the cropped image coordinate system
+        # Ajuste de coordenadas de los contornos y convex_hull
+        # debido al recorte de la imagen
         adjusted_contours = [cnt - np.array([x, y]) for cnt in cv2_contours]
         adjusted_hull = convex_hull - np.array([x, y])
 
@@ -87,35 +105,36 @@ class ImageRecognitionAlgorithm:
 
     @staticmethod
     def compute_features(image, contours, hull):
-        # Ensure contours and hull are numpy arrays
+        # Nos aseguramos que los contornos y el convex hull son np.array
         contours = np.array(contours, dtype=np.float32) if not isinstance(contours, np.ndarray) else contours
         hull = np.array(hull, dtype=np.float32) if not isinstance(hull, np.ndarray) else hull
 
-        # Compute Hu_Moments of the Convex Hull
+        # Cálculo de los momentos de Hu (convex_hull)
         moments = cv2.moments(hull)
         hu_moments = cv2.HuMoments(moments).flatten()
 
-        # Compute Area and Perimeter
+        # Cálculo del área y perímetro de los contornos de la imagen
         area = cv2.contourArea(contours)
         perimeter = cv2.arcLength(contours, True)
 
-        # Compute Circularity
+        # Circularidad
         circularity = (4 * np.pi * area) / (perimeter ** 2) if perimeter != 0 else 0
 
-        # Compute Convex Hull Features
+        # Caracteristicas geometricas del convex hull
         hull_area = cv2.contourArea(hull)
         hull_perimeter = cv2.arcLength(hull, closed=True)
 
         solidity = area / hull_area if hull_area != 0 else 0
         convexity = hull_perimeter / perimeter if perimeter != 0 else 0
+        hull_circularity = (4 * np.pi * hull_area) / (hull_perimeter ** 2) if hull_perimeter != 0 else 0
 
-        # Compute Min Enclosing Circle
+        # Cálculo del menor circulo que encierra al convex hull
         (x, y), radius = cv2.minEnclosingCircle(hull)
         circle_area = math.pi * (radius ** 2)
 
         area_ratio = hull_area / circle_area if circle_area != 0 else 0
 
-        # Compute Ellipse Fitting
+        # Ellipse fitting
         if len(hull) >= 5:  # cv2.fitEllipse requires at least 5 points
             ellipse = cv2.fitEllipse(hull)
             major_axis = max(ellipse[1])
@@ -125,90 +144,74 @@ class ImageRecognitionAlgorithm:
         else:
             major_axis, minor_axis, axis_aspect_ratio, eccentricity = 0, 0, 0, 0
 
-        # Compute Perimeter/Area Ratio
-            per_area_aspect_ratio = perimeter / hull_area if hull_area != 0 else 0
+        # Perimetro / Area (No muy util)
+        per_area_aspect_ratio = perimeter / hull_area if hull_area != 0 else 0
 
-        # Solo conservamos el primer momento de Hu, el circleAreaRatio y el eccentricity
-        features = np.append(hu_moments[0], np.array([area_ratio, eccentricity]))
+
+        features = np.concatenate((hu_moments, [area, perimeter, circularity, hull_circularity,
+                                    solidity, convexity,area_ratio, axis_aspect_ratio,
+                                    eccentricity, per_area_aspect_ratio]))
         return features
 
     def scale_features(self, features):
-        features = features.reshape(-1)  # Ensure (3,) shape
-        mean = self.features_mean_.reshape(-1)  # Ensure (3,) shape
-        var = self.features_var_.reshape(-1)  # Ensure (3,) shape
+        features = features.reshape(-1)  # Ensure (n,) shape
+        mean = self.features_mean_.reshape(-1)  # Ensure (n,) shape
+        var = self.features_var_.reshape(-1)  # Ensure (n,) shape
 
         if features.shape[0] != mean.shape[0]:
             raise ValueError(f"Feature dimension mismatch: {features.shape[0]} vs {mean.shape[0]}")
 
         predict_features_scaled = (features - mean) / np.sqrt(var)
-        return predict_features_scaled  # Ensuring (3,) shape
+        return predict_features_scaled  # Ensuring (n,) shape
+
+    def select_features(self, features):
+        # Get indices of chosen features
+        indices = [self.features_names.index(feature) for feature in self.chosen_features]
+        return features[indices]
+
     @staticmethod
     def draw_convex_hull(cropped_image, adjusted_hull):
-        """
-        Draw the convex hull contour on the cropped image in red.
-
-        Parameters:
-            cropped_image (np.array): The cropped object image.
-            adjusted_hull (list): The convex hull contour.
-
-        Returns:
-            np.array: Cropped image with convex hull drawn in red.
-        """
         # Convert to BGR if the image is grayscale
         if len(cropped_image.shape) == 2:  # Grayscale
             cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_GRAY2BGR)
 
-        # Ensure adjusted_hull is in correct format
+        # Si existe el convex_hull, lo añadimos a la imagen
         if len(adjusted_hull) > 0:
             hull_array = np.array([adjusted_hull], dtype=np.int32)
-
-            # Draw the convex hull in red (BGR: (0, 0, 255))
             cv2.polylines(cropped_image, hull_array, isClosed=True, color=(255, 0, 0), thickness=4)
 
         return cropped_image  # Returns the numpy array with the red convex hull
 
     def plot_3d_comparison(self, predict_features_scaled, train_features_scaled, train_labels, filename):
-        """
-        Plot a 3D comparison of the training features and the predicted feature.
 
-        Parameters:
-            predict_features_scaled (np.array): Scaled features of the predicted object.
-            train_features_scaled (np.array): Scaled features of the training data.
-            train_labels (np.array): Labels of the training data.
-            filename (str): Name of the file to save the plot.
-        """
         # Create a 3D plot
-        fig = plt.figure(figsize=(14, 10))  # Increased figure size for better spacing
+        fig = plt.figure(figsize=(14, 10))
         ax = fig.add_subplot(111, projection='3d')
         ax.view_init(elev=35, azim=65)
 
-        # Plot the training features
+        # Plot the training instances
         scatter = ax.scatter(train_features_scaled[:, 0], train_features_scaled[:, 1], train_features_scaled[:, 2],
-                             c=train_labels, cmap='viridis', label='Training Data', alpha=0.6)
+                             c=train_labels, cmap='viridis', label='Datos de entrenamiento', alpha=0.6)
 
-        # Plot the predicted feature
+        # Plot the predicted instance
         ax.scatter(predict_features_scaled[0], predict_features_scaled[1], predict_features_scaled[2],
-                   c='red', marker='X', s=200, label='Predicted Instance')
+                   c='red', marker='X', s=200, label='Punto de datos de entrada')
 
         # Create a custom legend for the training data colors
         unique_labels = np.unique(train_labels)
         cmap = ListedColormap(plt.cm.viridis(np.linspace(0, 1, len(unique_labels))))
-        legend_elements = [Patch(facecolor=cmap(i), label=f'Label {self.category_mapping[int(label)]}') for i, label in enumerate(unique_labels)]
+        legend_elements = [Patch(facecolor=cmap(i), label=f'Clase {self.category_mapping[int(label)]}') for i, label in enumerate(unique_labels)]
 
         # Add the predicted feature to the legend
-        legend_elements.append(Patch(facecolor='red', label='Predicted Feature'))
-
-        # Add the combined legend to the plot
+        legend_elements.append(Patch(facecolor='red', label='Punto de datos de entrada'))
         ax.legend(handles=legend_elements, title="Legend", bbox_to_anchor=(1.15, 1), loc='upper left')
 
-        plt.title('3D Comparison of Training Features and Predicted Instance', pad=20)  # Add padding to the title
+        plt.title('Gráfico 3D de comparación', pad=20)
 
-        # Adjust layout to prevent overlap
-        plt.subplots_adjust(left=0.1, right=0.8, bottom=0.1, top=0.9)  # Manually adjust subplot margins
-        # Add labels with increased padding
-        ax.set_xlabel('Feature 1 (Scaled Hu Moment 1)', labelpad=15, )  # Increased padding for x-axis
-        ax.set_ylabel('Feature 2 (Scaled Circle Area Ratio)', labelpad=15)  # Increased padding for y-axis
-        ax.set_zlabel('Feature 3 (Scaled Eccentricity)', labelpad=15)  # Increased padding for z-axis
+        plt.subplots_adjust(left=0.1, right=0.8, bottom=0.1, top=0.9)
+        ax.set_xlabel(f'Característica 1 ({self.chosen_features[0]})', labelpad=15, )
+        ax.set_ylabel(f'Característica 2 ({self.chosen_features[1]})', labelpad=15)
+        ax.set_zlabel(f'Característica 3 ({self.chosen_features[2]})', labelpad=15)
         # Save the plot
         plt.savefig(filename, format='png', dpi=300, bbox_inches='tight', pad_inches=1)
         plt.close()
@@ -219,30 +222,43 @@ class KNN(ImageRecognitionAlgorithm):
         self.k = k
         self.predict_image = predict_image
 
-        # Load train features from CSV file
+        # Carga las características de entrenamiento a partir de un archivo CSV.
         self.train_features = np.loadtxt(train_filename, delimiter=',', skiprows=1)  # Skip header
         self.X = self.train_features[:, :-1]
         self.y = self.train_features[:, -1]
 
+        # Seleccionamos las caracteristicas
+        self.indices = [self.features_names.index(feature) for feature in self.chosen_features]
+        self.X = self.X[:, self.indices]
+
     def launch_knn(self):
-        # Preprocess the original image
+        # Procesa la imagen origianl
         gray_img, img_filtered, thresh_image, closed_image = self.preprocess_image(self.predict_image)
 
-        # Get the object contours
+        # Nos aseguramos que la imagen esté en el formato correcto (uint8)
+        if closed_image.dtype == np.bool_:
+            closed_image = closed_image.astype(np.uint8) * 255
+
+        # Búsqueda de contornos
         contours = self.search_contours(closed_image, min_length=100)
 
-        # Crop the image around the detected object
+        # Recorta la imagen alrededor del contorno principal (convex_hull)
         cropped_image, adjusted_contours, adjusted_hull = self.crop_object(closed_image, contours)
 
+        # Construye la imagen que luego se muestra en la interfaz de usuario
         hull_image = self.draw_convex_hull(cropped_image, adjusted_hull)
 
-        # Compute the object set of features
+        # Cálculo de caracteristicas
         predict_features = self.compute_features(cropped_image,adjusted_contours, adjusted_hull)
 
-        # Scale the features
+        # Procesamiento de caracteristicas (cambio de escala)
         predict_features_scaled =  self.scale_features(predict_features)
 
-        # KNN Algorithm
+        # Seleccion de caracteristicas
+        predict_features = self.select_features(predict_features)
+        predict_features_scaled = self.select_features(predict_features_scaled)
+
+        # Algoritmo KNN)
         if self.X.shape[1] != predict_features_scaled.shape[0]:
             raise f"Invalid input shape. It should be {self.X.shape} but it is {predict_features_scaled.shape}."
         if self.k <= len(np.unique(self.y)):
@@ -256,30 +272,27 @@ class KNN(ImageRecognitionAlgorithm):
         votes = [i[1] for i in sorted(distances)[:self.k]]
         vote_result = Counter(votes).most_common(1)[0]
 
-        vote_result_categorical = self.category_mapping[int(vote_result[0])]  # Gives the name of the class ('arandela' for example)
+        vote_result_categorical = self.category_mapping[int(vote_result[0])]  # Devuelve el nombre de la clase ('arandela' por ejemplo)
         confidence = vote_result[1] / self.k
 
-        self.plot_3d_comparison(predict_features_scaled, self.X, self.y, '3d_plot_comparison.png')
+        if len(predict_features_scaled) == 3:
+            self.plot_3d_comparison(predict_features_scaled, self.X, self.y, '3d_plot_comparison.png')
 
-        return vote_result_categorical, confidence, hull_image, predict_features, predict_features_scaled
+        return vote_result_categorical, confidence, hull_image, predict_features, predict_features_scaled, self.chosen_features
 
 
 class KMeans(ImageRecognitionAlgorithm):
     def __init__(self, train_filename, predict_image, k=4, max_iters=100, tol=1e-4, n_init = 10):
-        """
-        Parameters:
-        - X: numpy array of shape (n_samples, n_features), the input data.
-        - k: int, the number of clusters.
-        - max_iters: int, maximum number of iterations per run.
-        - tol: float, tolerance for convergence.
-        - n_init: int, number of times to run K-Means with different initializations.
-        """
         self.predict_image = predict_image
 
-        # Load train features from CSV file
+        # Carga los datos de entrenamiento a partir de un archivo CSV
         self.train_features = np.loadtxt(train_filename, delimiter=',', skiprows=1)  # Skip header
         self.X = self.train_features[:, :-1]
         self.y = self.train_features[:, -1]
+
+        # Seleccionamos las caracteristicas
+        self.indices = [self.features_names.index(feature) for feature in self.chosen_features]
+        self.X = self.X[:, self.indices]
 
         self.k = k
         self.max_iters = max_iters
@@ -289,25 +302,25 @@ class KMeans(ImageRecognitionAlgorithm):
 
     @staticmethod
     def initialize_centroids(X, k):
-        """Randomly chose k centroids from the dataset."""
+        """Elige k centroides aleatoriamente."""
         indices = np.random.choice(X.shape[0], k, replace=False)
         return X[indices]
 
     @staticmethod
     def kmeans_plusplus_initialization(X, k):
         """
-        K-Means++ initialization for selecting initial centroids.
+        Inicialización Kmeans++ para seleccionar los k centroides iniciales.
         """
         n_samples, n_features = X.shape
 
-        # Step 1: Randomly select the first centroid
+        # Paso 1 : Elegir aleatoriamente el primer centroide
         centroids = [X[np.random.choice(n_samples)]]
 
         for _ in range(1, k):
-            # Step 2: Compute squared distances to the nearest centroid
+            # Paso 2: Calcular la distancia al centroide más cercano
             distances = np.array([min([np.linalg.norm(x - c) ** 2 for c in centroids]) for x in X])
 
-            # Step 3: Select the next centroid with probability proportional to distances
+            # Paso 3: Selecciona el siguiente centroide con probabilidad proporcional a la distancia
             probabilities = distances / distances.sum()
             next_centroid_idx = np.random.choice(n_samples, p=probabilities)
             centroids.append(X[next_centroid_idx])
@@ -316,13 +329,13 @@ class KMeans(ImageRecognitionAlgorithm):
 
     @staticmethod
     def assign_clusters(X, centroids):
-        """Assign each point to the nearest centroid."""
+        """Asigna cada punto al centroide más cercano."""
         distances = np.linalg.norm(X[:, np.newaxis] - centroids, axis=2)
         return np.argmin(distances, axis=1)
 
     @staticmethod
     def update_centroids(X, labels, k):
-        """Compute new centroids as the mean of points in each cluster."""
+        """Calcula los nuevos centroides como la media de los puntos en cada cluster."""
         return np.array([X[labels == i].mean(axis=0) for i in range(k)])
 
     def predict(self, predict, centroids):
@@ -343,75 +356,71 @@ class KMeans(ImageRecognitionAlgorithm):
 
     @staticmethod
     def clustering_accuracy(y_true, y_pred, cluster_mapping):
-        """Computes the clustering accuracy based on cluster-label mapping."""
+        """Calcula la precision del clustering en base al mapeo."""
         correct_count = np.sum([cluster_mapping[label] == y_true[i] for i, label in enumerate(y_pred)])
         total_count = len(y_true)
         return correct_count / total_count
 
     def plot_3d_comparison(self, predict_features_scaled, train_features_scaled, train_labels, filename):
-        """
-        Plot a 3D comparison of the training features and the predicted feature.
 
-        Parameters:
-            predict_features_scaled (np.array): Scaled features of the predicted object.
-            train_features_scaled (np.array): Scaled features of the training data.
-            train_labels (np.array): Labels of the training data.
-            filename (str): Name of the file to save the plot.
-        """
-        # Create a 3D plot
-        fig = plt.figure(figsize=(14, 10))  # Increased figure size for better spacing
+        fig = plt.figure(figsize=(14, 10))
         ax = fig.add_subplot(111, projection='3d')
         ax.view_init(elev=35, azim=65)
 
-        # Plot the training features
+        # Datos de entrenamiento
         scatter = ax.scatter(train_features_scaled[:, 0], train_features_scaled[:, 1], train_features_scaled[:, 2],
-                             c=train_labels, cmap='viridis', label='Training Data', alpha=0.6)
+                             c=train_labels, cmap='viridis', label='Datos de entrenamiento', alpha=0.6)
 
-        # Plot the predicted feature
+        # Dato de entrada
         ax.scatter(predict_features_scaled[0], predict_features_scaled[1], predict_features_scaled[2],
-                   c='red', marker='X', s=200, label='Predicted Instance')
+                   c='red', marker='X', s=200, label='Punto de datos de entrada')
 
-        # Create a custom legend for the training data colors
         unique_labels = np.unique(train_labels)
         cmap = ListedColormap(plt.cm.viridis(np.linspace(0, 1, len(unique_labels))))
-        legend_elements = [Patch(facecolor=cmap(i), label=f'Group {int(label)}') for i, label in enumerate(unique_labels)]
+        legend_elements = [Patch(facecolor=cmap(i), label=f'Grupo {int(label)}') for i, label in enumerate(unique_labels)]
 
-        # Add the predicted feature to the legend
-        legend_elements.append(Patch(facecolor='red', label='Predicted Feature'))
+        legend_elements.append(Patch(facecolor='red', label='Punto de datos de entrada'))
 
-        # Add the combined legend to the plot
         ax.legend(handles=legend_elements, title="Legend", bbox_to_anchor=(1.15, 1), loc='upper left')
 
-        plt.title('3D Comparison of Training Features and Predicted Instance', pad=20)  # Add padding to the title
+        plt.title('Gráfico 3D de comparación', pad=20)
 
-        # Adjust layout to prevent overlap
-        plt.subplots_adjust(left=0.1, right=0.8, bottom=0.1, top=0.9)  # Manually adjust subplot margins
-        # Add labels with increased padding
-        ax.set_xlabel('Feature 1 (Scaled Hu Moment 1)', labelpad=15, )  # Increased padding for x-axis
-        ax.set_ylabel('Feature 2 (Scaled Circle Area Ratio)', labelpad=15)  # Increased padding for y-axis
-        ax.set_zlabel('Feature 3 (Scaled Eccentricity)', labelpad=15)  # Increased padding for z-axis
-        # Save the plot
+        plt.subplots_adjust(left=0.1, right=0.8, bottom=0.1, top=0.9)
+        ax.set_xlabel('Característica 1 (Scaled Hu Moment 1)', labelpad=15)
+        ax.set_ylabel('Característica 2 (Scaled Ratio de área circular)', labelpad=15)
+        ax.set_zlabel('Característica 3 (Scaled Excentricidad)', labelpad=15)
+
         plt.savefig(filename, format='png', dpi=300, bbox_inches='tight', pad_inches=1)
         plt.close()
 
     def launch_kmeans(self):
-        # Preprocess the original image
+        # Procesamiento de la imagen original
         gray_img, img_filtered, thresh_image, closed_image = self.preprocess_image(self.predict_image)
 
-        # Get the object contours
+        # Nos aseguramos que la imagen esté en el formato correcto (uint8)
+        if closed_image.dtype == np.bool_:
+            closed_image = closed_image.astype(np.uint8) * 255  # Convert boolean to uint8 (0 or 255)
+
+        # Búsqueda de contornos
         contours = self.search_contours(closed_image, min_length=100)
 
-        # Crop the image around the detected object
+        # Recorta la imagen alrededor del contorno principal
         cropped_image, adjusted_contours, adjusted_hull = self.crop_object(closed_image, contours)
 
+        # Obtiene la imagen que luego se muestra en la interfaz de usuario
         hull_image = self.draw_convex_hull(cropped_image, adjusted_hull)
 
-        # Compute the object set of features
+        # Cálculo de caracteristicas
         predict_features = self.compute_features(cropped_image,adjusted_contours, adjusted_hull)
 
-        # Scale the features
+        # Procesamiento de caracteristicas (cambio de escala)
         predict_features_scaled =  self.scale_features(predict_features)
 
+        # Seleccion de caracteristicas
+        predict_features = self.select_features(predict_features)
+        predict_features_scaled = self.select_features(predict_features_scaled)
+
+        # Algoritmo Kmeans
         best_inertia = np.inf
         best_centroids = None
         best_labels = None
@@ -423,36 +432,37 @@ class KMeans(ImageRecognitionAlgorithm):
                 labels = self.assign_clusters(self.X, centroids)
                 new_centroids = self.update_centroids(self.X, labels, self.k)
 
-                # Check for convergence
+                # Convergencia ?
                 if np.linalg.norm(new_centroids - centroids) < self.tol:
                     break
 
                 centroids = new_centroids
 
-            # Compute inertia (sum of squared distances)
+            # Cálculo de la inercia del clustering resultante
             inertia = np.sum([np.linalg.norm(self.X[labels == j] - centroids[j]) ** 2 for j in range(self.k)])
 
-            # Update best result
+            # Actualiza el mejor resultado
             if inertia < best_inertia:
                 best_inertia = inertia
                 best_centroids = centroids
                 best_labels = labels
 
-        print(f"Resulting centroids: {best_centroids}")
+        print(f"Centroides encontrados: {best_centroids}")
 
         # Cluster to Label mapping
         mapping = self.cluster_to_label_mapping(np.array(self.y), np.array(best_labels))
-        print("Cluster to Label Mapping:", mapping)
+        print("Mapa Cluster->Clase:", mapping)
 
         accuracy = self.clustering_accuracy(self.y, best_labels, mapping)
-        print(f"Clustering Accuracy: {accuracy:.2%}")
+        print(f"Precisión del agrupamiento: {accuracy:.2%}")
 
-        # Predict image
+        # Predice la imagen
         predicted_group = self.predict(predict_features_scaled.reshape(1, -1), best_centroids)[0]
         predicted_label_int = mapping[predicted_group]
         predicted_label = self.category_mapping[predicted_label_int]
-        print(f"Predicted group: {predicted_group} - Mapped Label: {predicted_label_int} - Label: {predicted_label}")
+        print(f"Grupo predicho: {predicted_group} - Clase mapeada: {predicted_label_int} - Clase: {predicted_label}")
 
-        self.plot_3d_comparison(predict_features_scaled, self.X, best_labels, '3d_plot_comparison.png')
+        if len(predict_features_scaled) == 3:
+            self.plot_3d_comparison(predict_features_scaled, self.X, best_labels, '3d_plot_comparison.png')
 
-        return predicted_group, predicted_label, accuracy, hull_image, predict_features, predict_features_scaled
+        return predicted_group, predicted_label, accuracy, hull_image, predict_features, predict_features_scaled, self.chosen_features

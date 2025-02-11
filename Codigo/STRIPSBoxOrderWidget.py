@@ -7,7 +7,7 @@ class BoxOrderWindow(QWidget):
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
-        self.setWindowTitle("Box Order")
+        self.setWindowTitle("Ordenamiento de cajas")
         self.setMinimumSize(600, 800)
         self.setStyleSheet("background-color: none;")
 
@@ -40,14 +40,14 @@ class BoxOrderWindow(QWidget):
         top_layout.setAlignment(column1_layout, Qt.AlignLeft)
         top_layout.setAlignment(column2_layout, Qt.AlignRight)
 
-        self.title_label = QLabel("Blocks world Solver")
+        self.title_label = QLabel("Reordenamiento de cajas")
         self.title_label.setStyleSheet("font-weight: bold;")
         self.title_label.setFont(title_font)
         self.title_label.setContentsMargins(0, 20, 0, 10)
 
-        self.search_button = QPushButton("Search Solution")
+        self.search_button = QPushButton("Buscar solución")
         self.search_button.setFont(normal_font)
-        self.search_button.setStyleSheet("background-color: #CCD2CD;")
+        self.search_button.setStyleSheet("background-color: #CCD2CD; margin-left:35px;")
         self.search_button.setFixedSize(250, 40)
 
         buttons_column_layout.addWidget(self.title_label)
@@ -66,7 +66,7 @@ class BoxOrderWindow(QWidget):
         buttons_column_layout.addStretch()  # Push the button to the top of the column
 
         # Create and add the global label
-        self.global_label = QLabel("Initial State", self)
+        self.global_label = QLabel("Estado inicial", self)
         self.global_label.setAlignment(Qt.AlignLeft)
         self.global_label.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px; padding-left: 70px;")
         self.global_label.setFixedHeight(40)  # Set a fixed height for the label
@@ -75,7 +75,7 @@ class BoxOrderWindow(QWidget):
         # Spacer to push the rectangles down below the global label
         column1_layout.addStretch()
 
-        self.final_state_label = QLabel("Final State", self)
+        self.final_state_label = QLabel("Estado objetivo", self)
         self.final_state_label.setAlignment(Qt.AlignLeft)
         self.final_state_label.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px; padding-right: 420px;")
         self.final_state_label.setFixedHeight(40)
@@ -113,10 +113,10 @@ class BoxOrderWindow(QWidget):
         ]
 
         self.labels = [
-            "Bolt",
-            "Nut",
-            "Washer",
-            "Nail"
+            "Tornillo",
+            "Tuerca",
+            "Arandela",
+            "Clavo"
         ]
 
         self.rectangles_init = [
@@ -145,7 +145,7 @@ class BoxOrderWindow(QWidget):
         solution = self.controller.search_ppdl_solution(self.rectangles_init, self.rectangles_final)
 
         # Display solution in a label under the search button
-        solution_text = "Found solution : \n"
+        solution_text = "Solución encontrada : \n"
         #print(solution)
         for i, step in enumerate(solution):
             solution_text += f"\t{i}): {step}\n"

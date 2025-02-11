@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QRad
     QDesktopWidget, QLabel, QAction, QToolBar, QStackedWidget
 from PyQt5.QtGui import QPainter, QColor, QFont
 from PyQt5.QtCore import Qt
-from Solver import AStarSolver, DijkstraSolver, ModifiedAStarSolver
+from Solver import AStarSolver, BPASolver, ModifiedAStarSolver
 from STRIPSBoxOrderWidget import BoxOrderWindow
 from ObjectRecognitionWindow import ObjectRecognitionWindow
 from MazeWidget import  MazeWidget
@@ -12,7 +12,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.controller = controller
 
-        self.setWindowTitle("Maze Generator & Solver")
+        self.setWindowTitle("Trabajo Final - Inteligencia Artificial 1 - CORAZZA")
         # Get screen resolution
         screen_resolution = QDesktopWidget().screenGeometry()
         width, height = int(screen_resolution.width()), int(screen_resolution.height())
@@ -23,34 +23,34 @@ class MainWindow(QMainWindow):
         self.setGeometry(0, 0, width, height)
 
         self.maze_widget = MazeWidget(self.controller.maze, self.controller)
-        self.solve_button = QPushButton("Solve Maze")
+        self.solve_button = QPushButton("Buscar ruta")
         self.solve_button.setFont(normal_font)
         self.solve_button.setStyleSheet("background-color: #CCD2CD;")
         self.solve_button.clicked.connect(self.controller.solve_maze)
 
-        self.generate_button = QPushButton("Generate Maze")
+        self.generate_button = QPushButton("Generar laberinto")
         self.generate_button.setFont(normal_font)
         self.generate_button.setStyleSheet("background-color: #CCD2CD;")
         self.generate_button.clicked.connect(self.generate_maze)
 
-        self.clear_button = QPushButton("Clear Maze")
+        self.clear_button = QPushButton("Borrar laberinto")
         self.clear_button.setFont(normal_font)
         self.clear_button.setStyleSheet("background-color: #CCD2CD;")
         self.clear_button.clicked.connect(self.clear_maze)
 
-        self.title_label = QLabel("Maze Generator & Solver")
+        self.title_label = QLabel("Transporte de cajas")
         self.title_label.setFont(title_font)
         self.title_label.setContentsMargins(0, 0, 0, 10)
 
-        self.solver_label = QLabel("Choose Maze Solver: ")
+        self.solver_label = QLabel("Algoritmo de búsqueda: ")
         self.solver_label.setFont(normal_font)
         self.solver_label.setContentsMargins(5, 5, 0, 0)
 
-        self.astar_radio = QRadioButton("A* Solver")
+        self.astar_radio = QRadioButton("Algoritmo A*")
         self.astar_radio.setFont(normal_font)
-        self.dijkstra_radio = QRadioButton("Dijkstra Solver")
+        self.dijkstra_radio = QRadioButton("Búsqueda Primero en Anchura")
         self.dijkstra_radio.setFont(normal_font)
-        self.modified_astar_radio = QRadioButton("Modified A* Solver")
+        self.modified_astar_radio = QRadioButton("Algoritmo A* modificado")
         self.modified_astar_radio.setFont(normal_font)
 
         self.astar_radio.setChecked(True)
@@ -121,28 +121,28 @@ class MainWindow(QMainWindow):
         self.create_toolbar()
 
     def create_toolbar(self):
-        toolbar = QToolBar("Main Toolbar")
+        toolbar = QToolBar("Barra de herramientas")
         toolbar.setStyleSheet("background-color: #AAAAAA;")
         self.addToolBar(toolbar)
 
-        maze_action = QAction("Maze Solver", self)
+        maze_action = QAction("Transporte de cajas", self)
         maze_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         toolbar.addAction(maze_action)
 
-        box_order_action = QAction("Box Order", self)
+        box_order_action = QAction("Reordenamiento de cajas", self)
         box_order_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(1))
         toolbar.addAction(box_order_action)
 
-        object_recognition_action = QAction("Object Recognition", self)
+        object_recognition_action = QAction("Identificación de objetos", self)
         object_recognition_action.triggered.connect(lambda: self.stacked_widget.setCurrentIndex(2))
         toolbar.addAction(object_recognition_action)
 
     def update_path_stats_label(self):
         path_stats = self.maze_widget.path_stats
-        text = f"""Solver Information: 
-        \tNumber of visited cells: {path_stats["N_Visited"]}
-        \tTime Spent: {path_stats["Time_Spent"]}
-        \tRoute Cost: {path_stats["Route_Cost"]} steps"""
+        text = f"""Estadísticas del algoritmo: 
+        \tNúmero de casillas visitadas: {path_stats["N_Visited"]}
+        \tTiempo transcurrido: {path_stats["Time_Spent"]}
+        \tCosto de la ruta: {path_stats["Route_Cost"]} pasos"""
 
         self.path_stats_label.setText(text)
 
@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
         if self.astar_radio.isChecked():
             return AStarSolver(self.controller.maze)
         elif self.dijkstra_radio.isChecked():
-            return DijkstraSolver(self.controller.maze)
+            return BPASolver(self.controller.maze)
         elif self.modified_astar_radio.isChecked():
             return ModifiedAStarSolver(self.controller.maze)
 
